@@ -1,0 +1,171 @@
+
+Code levelization: subpackage dependencies
+------------------------------------------
+
+(ref.: John Lakos, Large-Scale C++ Software Design. Addison-Wesley, 1996)
+
+[implementation highlights are in brackets]
+
+    CUDA
+    MPI
+0.  MAGMA (patched)
+          Patches to MAGMA to support needed modified GEMM operations
+
+
+1.  assertions
+          Macros and code for assertions
+    types
+          Fundamental scalar types for algorithms; associated functions
+          [types to support single or double build]
+          [types to support 2x2 or 2x2x2 table]
+    env
+          Basic environment - settings, MPI communicators, etc.
+          [control of MPI proc grid axis order: vector, field, repl]
+          [CoMet code proper does 1 phase/stage; driver loops to do multiple]
+
+
+2.  linalg_accel
+          CUDA code, primarily for using tensor cores
+          [operations: alloc/free buffers, copy in, GEMM, adjust output]
+          [A and B are decomposed into block rows to conserve memory]
+          [permutation is required to make each 2x2 table contig in memory]
+
+
+3.  decomp_mgr
+          Define distribution of vectors to MPI ranks, padding needed, etc.
+          [add padding vectors and fields to make same size per proc]
+          [bitwise-field methods have notion of "packed field" (whole word)]
+
+
+4.  linalg
+          Interface to generalized linear algebra functions, e.g. MAGMA
+          [because of MAGMA limitations, tile the GEMM to smaller sizes]
+    mirrored_buf
+          Struct/code to manage dual CPU/GPU reflected arrays
+          [CPU/pinneed and GPU mem, same size; user chooses when to reflect]
+
+
+5a. vectors
+          Class to manage the set of vectors taken as input to the methods
+          [need to set pad to zero since methods will compute on pad]
+          [vector data can be either simple memory or pointer to mirrored buf]
+          [can also copy vector memory to separate buf]
+5b. metrics
+    metrics_2way_indexing
+    metrics_2way_accessors
+    metrics_3way_indexing
+    metrics_3way_accessors
+          Class to manage the calculated metrics output from the methods
+          [MetricsMem is reusable/resizable - used to avoid costly CUDA mallocs]
+          [Czek stores num/denom together; CCC stored separately]
+          [CCC requires sums "S" for denoms; CCC/sparse also needs counts "C"]
+          [for some methods zeros matter, so "adjust" to remove pad effects]
+          [2-way (3-way) method: produces 2D (3D) blocks]
+          [2-way (3-way) method: vector_proc owns block row (slab of blocks)]
+          [num_phase, num_proc_repl > 1 means skipped blocks, complicated code]
+          [2-way: block active elts form triangle or square]
+          [3-way: block active elts form tetrahedron, triang prism, or slice]
+          [maps from local ij(k) and j_proc(k_proc) to metric index in memory]
+          [maps from metric index in memory to (precomputed) global ij(k) coord]
+          [_S_ (_C_) array stores packed 2 or 3 sums (counts)]
+          [CCC methods compute num/denom quotient etc. in the accessor]
+          [version to compute with int128 arith to ensure reproducibility]
+          [version to compute threshold test quickly for speed]
+          [3-way: SectionInfo struct to manage slice indexing]
+          [3-way: ijk can be permuted for speed based on slice orientation]
+          [3-way: index cache struct to reuse expensive index calcs]
+
+
+6a. vector_sums (depends on 5a)
+          Compute the denominators needed by the methods
+          [CCC: REF method computes 2-bits at a time, CPU whole word]
+          [if num_proc_field > 1, need reduction]
+6b. checksum (depends on 5b)
+          Utility to compute checksum of data in a metrics object
+          [checksum per element is hashed-global-index times metric-value]
+          ["locality-preserving" but bitwise accurate and decomp-independent]
+          [multiprecision integers used]
+6c. comm_xfer_utils
+          Utilities for communication and CPU/GPU transfer of vectors, metrics
+          [if num_proc_field > 1, need reduction]
+
+
+7a. compute_metrics_2way_block_nums
+          Calculate metrics numerators, 2-way, for a single block
+          [non-all2all special case code: every block computes triangle]
+7b. compute_metrics_2way_block_combine
+          Combine numerators and denominators, 2-way, for a single block
+          [2-way combine in separate function; 3-way: colocated with num calc]
+          [2-way, 3-way CCC: no combine; just save sums and counts]
+          [note metrics_buf is square, metrics is combined triang and squares]
+7c. compute_metrics_3way_block_nongpu
+          Calculate numerators, 3-way, for a single block, non-GPU case
+          [not-all2all is always tetrahedron, otherwise tet, prism or slice]
+    compute_metrics_3way_block_gpu
+          Calculate numerators, 3-way, for a single block, GPU case
+          [steps in inner loop: form X, mGEMM on X, add result into metrics]
+          [Czek requires 3 2-way matrices; CCC requires 3 inner mGEMM steps]
+          [pipeline loop over planes X mGEMM-steps]
+          [pipeline overlaps vecs-to-gpu, compute, metrics-from-gpu, reduce]
+          [use "lock" mechanism to check for potential race conditions]
+          [struct to keep track of current, next-step, lagged-step variables]
+          ["stage" setting controls which planes in slice computed]
+    compute_metrics_3way_block
+          Calculate numerators, 3-way, for a single block
+          [allocate-once memory to reuse across calls, for speed]
+
+
+8a. compute_metrics_2way (depends on 7a, 7b)
+          Calculate metrics, 2-way
+          [pipeline loop over blocks]
+          [vecs send/recv, vecs-to-gpu, compute, metrics-from-gpu, reduce]
+          [use "lock" mechanism to check for potential race conditions]
+          [struct to keep track of current, next-step, lagged-step variables]
+          [two options for order of operations, for speed]
+8b. compute_metrics_3way (depends on 7c)
+          Calculate metrics, 3-way
+          [pipeline loops over blocks (or blocks X slices)]
+          [pipeline overlap of vector send/recv, block (slice) compute]
+          [main diag, plane and volume blocks]
+          [1. main diag block loop 1 block (plane intersect main diag = point)]
+          [2. plane block loop singly nested (diag intersect diag plane = line)]
+          [3. volume block loop doubly nested loop (remaining blocks of slab)]
+          [compute is lagged with respect to comm; spill from one loop to next]
+          [num_phase and num_proc_repl may result in some steps skipped]
+
+
+9.  compute_metrics
+          Top-level function to calculate metrics
+
+
+10. input_output
+          Code to input vectors and write out metrics result
+          [MetricsFile top-level class to write to metrics file]
+          [MetricWriter helper class to write a single metric to metric file]
+          [highly optimized functions for CCC 2-way and 3-way writing metrics]
+          [CCC metrics write: special accessor to check threshold fast]
+          [CCC metrics write: buffer output metrics that pass threshold; flush]
+          [read vectors from file (Czek, CCC), according to file format]
+          [function to write vectors to file, for testing purposes]
+
+    test_problems
+          Code to generate synthetic test problems
+          [set vectors random: fully random; no known closed form solution]
+          [set vectors analytic: less random, closed form solution for checking]
+          [analytic: vectors block row with same entries down column; scramble]
+    driver
+          Driver to get options, generate or read input, calc and write metrics
+          [loop over requested stages, phases]
+          [use metrics_mem for reuse of metrics memory]
+
+
+11. genomics_metric
+          Main program
+          [warmup code to deal with GPU that might be initially slow]
+          [second warmup code to detect/mark slow nodes, map out]
+
+
+(unit test modules)
+          [most tests compare checksum for runs in different configurations]
+          [some ground-truth checks of CCC against hand-written examples]
+

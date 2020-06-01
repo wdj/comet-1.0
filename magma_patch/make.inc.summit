@@ -1,0 +1,29 @@
+#GPU_TARGET = Kepler
+GPU_TARGET = Volta
+CC        = gcc -DCUBLAS_GFORTRAN
+CXX       = g++
+NVCC      = nvcc
+#FORT      = gfortran -DCUBLAS_GFORTRAN
+ARCH      = ar
+ARCHFLAGS = cr
+RANLIB    = ranlib
+
+OPTS      = -O3 -DADD_ -fPIC
+F77OPTS   = -O3 -DADD_ -fno-second-underscore
+FOPTS     = -O3 -DADD_ -fno-second-underscore
+NVOPTS    = -O3 -DADD_ --compiler-options -fno-strict-aliasing -DUNIX
+LDOPTS    = -fPIC -Xlinker -zmuldefs
+LIB       = -lpthread -lcublas -lm -lcudart
+
+
+#FPIC      = -fPIC
+#CFLAGS    = -O3 $(FPIC) -DADD_
+#FFLAGS    = -O3 $(FPIC) -DADD_ -Wall -Wno-unused-dummy-argument
+#F90FLAGS  = -O3 $(FPIC) -DADD_ -Wall -Wno-unused-dummy-argument -x f95-cpp-input
+#NVCCFLAGS = -O3         -DADD_       -Xcompiler "-fno-strict-aliasing $(FPIC)"
+#LDFLAGS   =     $(FPIC)              -fopenmp
+#LIB       = -llapack -lblas -lcblas -lcublas -lcudart -lstdc++ -lm -lgfortran
+
+CUDADIR   = $(CUDA_DIR)
+LIBDIR    = -L$(CUDADIR)/lib64 
+INC       = -I$(CUDADIR)/include

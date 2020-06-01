@@ -1,0 +1,13 @@
+*/*/*.mod
+*/control/sizeptr
+*/control/stamp
+*/interface_cuda/stamp
+*/lib/libmagma_minproduct.a
+*/magma_*blas/stamp
+*/src/stamp
+*/testing/libtest.a
+*/testing/lin/liblapacktest.a
+*/testing/testing_*
+!*/testing/testing_*.cpp
+!*/testing/testing_*.f90
+!*/testing/testing_*.F90

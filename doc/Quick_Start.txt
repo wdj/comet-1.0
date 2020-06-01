@@ -1,0 +1,347 @@
+
+CoMet Quick Start Guide
+-----------------------
+
+The following is run on the ORNL Summit system.
+
+--------------------
+
+# To build all versions of the code:
+
+export OLCF_PROJECT=stf006  #---replace stf006 with your OLCF account id.
+cd $MEMBERWORK/$OLCF_PROJECT
+mkdir comet_work
+cd comet_work
+module load git
+git clone https://github.com/wdj/comet.git
+# or git clone https://code.ornl.gov/wjd/genomics_gpu.git
+genomics_gpu/scripts/configure_all.sh
+genomics_gpu/scripts/make_all.sh
+
+--------------------------------------------------------------------------------
+
+genomics_metric: calculation of comparison metrics from genomics data
+
+Usage:
+
+    genomics_metric <option> ...
+
+Options:
+
+    --num_field <value>
+        (Required) the number of elements in each vector
+
+    --num_field_local <value>
+        (Required) the number of elements in each vector on each processor
+
+    --num_vector <value>
+        (Required) the number of vectors to be processed
+    --num_vector_local <value>
+        (Required) the number of vectors to be processed on each processor
+
+    --metric_type <value>
+        metric type to compute (czekanowski=Czekanowski (default),
+        ccc=CCC, duo=DUO)
+
+    --ccc_multiplier <value>
+        fixed front multiplier value used to calculate the CCC metric
+        (default floating point value is 9/2 for CCC).
+
+    --duo_multiplier <value>
+        fixed front multiplier value used to calculate the DUO metric
+        (default floating point value is 4 for DUO).
+
+    --ccc_param <value>
+        fixed coefficient value used to calculate the CCC or DUO metric
+        (default floating point value is 2/3).
+
+    --sparse <value>
+        for CCC and DUO metric, interpret vector entries of binary "10"
+        as empty or incomplete data (yes=yes, no=no (default))
+
+    --num_way <value>
+        dimension of metric to compute (2=2-way (default), 3=3-way)
+
+    --all2all <value>
+        whether to perform global all-to-all rather than computing
+        on each processor separately (yes=yes, no=no (default))
+
+    --compute_method <value>
+        manner of computing the result (CPU=cpu, GPU=gpu (default),
+        REF=reference method)
+
+    --tc <value>
+        for GPU method on platforms that support it, use the GPU
+        tensor cores for CCC and DUO (0=no (default), 1=yes)
+
+    --num_tc_steps <value>
+        for tensor core method, tuning parameter to reduce memory
+        usage on the GPU (default 1)
+
+    --num_proc_vector <value>
+        blocking factor to denote number of blocks used to decompose
+        the total number of vectors across processors 
+        (default is the total number of procs requested)
+
+    --num_proc_field <value>
+        blocking factor to denote number of blocks used to decompose
+        each vector across processors (default is 1)
+
+    --num_proc_repl <value>
+        processor replication factor.  For each block along the vector
+        and field axes, this number of processors is applied to
+        computations for the block (default is 1)
+
+    --num_stage <value>
+        the number of stages the computation is divided into
+        (default is 1) (available for 3-way case only)
+
+    --stage_min <value>
+        the lowest stage number of the sequence of stages to be computed
+        for this run (0-based, default is 0)
+
+    --stage_max <value>
+        the highest stage number of the sequence of stages to be computed
+        for this run (0-based, default is num_stage-1)
+
+    --num_phase <value>
+        the number of phases the computation is divided into
+        (default is 1)
+
+    --phase_min <value>
+        the lowest phase number of the sequence of phases to be computed
+        for this run (0-based, default is 0)
+
+    --phase_max <value>
+        the highest phase number of the sequence of phases to be computed
+        for this run (0-based, default is num_phase-1)
+
+    --input_file <value>
+        string denoting the filename or pathname file
+        used to store input vectors.  If this option not present,
+        a synthetic test case is run.
+
+    --problem_type <value>
+        the kind of synthetic test case to run. Allowed choices are
+        analytic (default) or random
+
+    --output_file_stub <value>
+        string denoting the filename or pathname stub of filenames
+        used to store result metrics.  Metric values are stored in files
+        whose names are formed by appending a unique identifier
+        (e.g., processor number) to the end of this string.  If this
+        option is absent, no output files are written.
+
+    --threshold <value>
+        output each result value only if its magnitude is greater than
+        this threshold.  If set negative, no thresholding is done
+        (default -1)
+
+    --checksum <value>
+        compute checksum of the metrics results (yes=yes (default), no=no)
+
+    --verbosity <value>
+       verbosity level of output (0=none, 1=some (default) 2,3=more)
+
+Input File Formats
+
+Input is stored as a single binary file; each process reads the part
+of the file it needs.  Elements of the matrix of vectors are stored in
+lexicographical order in the file, with the field dimension varyng
+fastest.  Raw values are stored in a packed fashion with no indexing
+data: dimensions are supplied via command line arguments.
+
+For the Czekanowski metric, values are stored packed in sequence as
+4-byte floats or 8-byte doubles, depending on the code version being
+used.
+
+CCC/DUO 2-bit values are packed 4 per byte, starting at the least significant
+bit of the byte.  For the 2 bits, the higher order bit is considered the
+"first" bit, the lower order bit is considered to be "second," thus
+for "01" or "(0,1)" the first but is "0" and the second bit is "1".
+Note for the sparse case "(1,0)" is the marker for a missing allele.
+The last byte of each vector is padded with zero bits before the next
+vector in the file is started.
+
+Output File Formats
+
+Output files are written one file per process.  The files are written
+in binary format as a packed series of results, written in no particular
+order.  Each value is stored as two (for 2-way) or three (for 3-way)
+8-byte unsigned integers, followed by the 4-byte (for single precision
+code version) or 8-byte (for double precision code version) floating
+point value.
+
+For the Czekanowski metric, each integer denotes the (0-based) vector
+number relevant to the metric value.
+
+For CCC and DUO, the lowest order bit of the integer denotes whether the
+0 bits or the 1 bits of the vector are being compared, and
+all other bits of the integer denote the vector number.
+
+For input and oputput, the endianness of integer and floating point
+values matches that of the system on which the code is run.
+
+--------------------------------------------------------------------------------
+
+#--------------------
+# Run the tester.
+#--------------------
+
+MY_PROJID=stf006  #---replace stf006 with your OLCF account id.
+bsub -P $MY_PROJID -Is -nnodes 2 -W 120 -alloc_flags gpumps $SHELL
+cd $MEMBERWORK/$MY_PROJID/comet_work
+module -q load gcc/6.4.0
+pushd build_test
+make test ARGS=-V
+popd
+
+--------------------------------------------------------------------------------
+
+# The following test runs assume:
+
+MY_PROJID=stf006  #---replace stf006 with your OLCF account id.
+bsub -P $MY_PROJID -Is -nnodes 2 -W 120 $SHELL
+cd $MEMBERWORK/$MY_PROJID/comet_work
+module -q load gcc/6.4.0
+
+# The following code also assumes bash shell.
+
+#--------------------
+# Small case, synthetic test problem, 2-way Czekanowski metric.
+#--------------------
+
+AR_PERFORMANCE_FLAGS="PAMI_IBV_ENABLE_DCT=1 PAMI_ENABLE_STRIPING=1 PAMI_IBV_ADAPTER_AFFINITY=0 PAMI_IBV_QP_SERVICE_LEVEL=8 PAMI_IBV_ENABLE_OOO_AR=1"
+
+env OMP_NUM_THREADS=7 $AR_PERFORMANCE_FLAGS \
+jsrun --nrs 1 --rs_per_host 1 \
+  --tasks_per_rs 1 --cpu_per_rs 7 --bind packed:7 --gpu_per_rs 1 -X 1 \
+  ./install_release/bin/genomics_metric \
+    --num_field 2 --num_vector 4 --num_proc_vector 1 \
+    --metric_type czekanowski --num_way 2 \
+    --compute_method GPU --all2all yes --verbosity 3
+
+vec_proc 0 vec 0 field_proc 0 field 0 value 1.000000e+00
+vec_proc 0 vec 0 field_proc 0 field 1 value 2.000000e+00
+vec_proc 0 vec 1 field_proc 0 field 0 value 3.000000e+00
+vec_proc 0 vec 1 field_proc 0 field 1 value 4.000000e+00
+vec_proc 0 vec 2 field_proc 0 field 0 value 2.000000e+00
+vec_proc 0 vec 2 field_proc 0 field 1 value 1.000000e+00
+vec_proc 0 vec 3 field_proc 0 field 0 value 4.000000e+00
+vec_proc 0 vec 3 field_proc 0 field 1 value 3.000000e+00
+element (0,1): value: 5.99999999999999978e-01
+element (0,2): value: 6.66666666666666630e-01
+element (1,2): value: 5.99999999999999978e-01
+element (0,3): value: 5.99999999999999978e-01
+element (1,3): value: 8.57142857142857095e-01
+element (2,3): value: 5.99999999999999978e-01
+metrics checksum 0-82898256547-645082804690974176 ctime 0.003188 ops 8.000000e+01 ops_rate 2.509681e+04 ops_rate/proc 2.509681e+04 vcmp 6.000000e+00 cmp 1.200000e+01 ecmp 1.200000e+01 ecmp_rate 3.764521e+03 ecmp_rate/proc 3.764521e+03 vctime 0.000018 mctime 0.000028 cktime 0.000045 intime 0.000082 outtime 0.000070 cpumem 6.720000e+02 gpumem 4.480000e+02 tottime 0.003595
+
+#--------------------
+# Larger case, multiple GPUs.
+#--------------------
+
+env OMP_NUM_THREADS=7 $AR_PERFORMANCE_FLAGS \
+jsrun --nrs 12 --rs_per_host 6 \
+  --tasks_per_rs 1 --cpu_per_rs 7 --bind packed:7 --gpu_per_rs 1 -X 1 \
+  ./install_release/bin/genomics_metric \
+    --num_field 20000 --num_vector 150000 --num_proc_vector 10 \
+    --metric_type czekanowski --num_way 2 \
+    --compute_method GPU --all2all yes --verbosity 1
+
+metrics checksum 95-731337953569731265-108597638988176688 ctime 25.810007 ops 4.950330e+14 ops_rate 1.917989e+13 ops_rate/proc 1.917989e+12 vcmp 1.124992e+10 cmp 2.249985e+14 ecmp 2.249985e+14 ecmp_rate 8.717491e+12 ecmp_rate/proc 8.717491e+11 vctime 0.031947 mctime 0.625697 cktime 53.964935 intime 1.176830 outtime 0.000040 cpumem 3.300012e+10 gpumem 1.080000e+10 tottime 81.609844
+
+#--------------------
+# 3-way Czekanowski metric, small case.
+#--------------------
+
+env OMP_NUM_THREADS=7 $AR_PERFORMANCE_FLAGS \
+jsrun --nrs 1 --rs_per_host 1 \
+  --tasks_per_rs 1 --cpu_per_rs 7 --bind packed:7 --gpu_per_rs 1 -X 1 \
+  ./install_release/bin/genomics_metric \
+    --num_field 2 --num_vector 4 --num_proc_vector 1 \
+    --metric_type czekanowski --num_way 3 \
+    --compute_method GPU --all2all yes --verbosity 3
+
+vec_proc 0 vec 0 field_proc 0 field 0 value 1.000000e+00
+vec_proc 0 vec 0 field_proc 0 field 1 value 2.000000e+00
+vec_proc 0 vec 1 field_proc 0 field 0 value 3.000000e+00
+vec_proc 0 vec 1 field_proc 0 field 1 value 4.000000e+00
+vec_proc 0 vec 2 field_proc 0 field 0 value 2.000000e+00
+vec_proc 0 vec 2 field_proc 0 field 1 value 1.000000e+00
+vec_proc 0 vec 3 field_proc 0 field 0 value 4.000000e+00
+vec_proc 0 vec 3 field_proc 0 field 1 value 3.000000e+00
+element (0,1,2): value: 6.92307692307692291e-01
+element (0,1,3): value: 7.94117647058823484e-01
+element (0,2,3): value: 6.92307692307692291e-01
+element (1,2,3): value: 7.94117647058823484e-01
+metrics checksum 0-84749404949-5538720434861296 ctime 0.003640 ops 1.280000e+02 ops_rate 3.516315e+04 ops_rate/proc 3.516315e+04 vcmp 4.000000e+00 cmp 8.000000e+00 ecmp 8.000000e+00 ecmp_rate 2.197697e+03 ecmp_rate/proc 2.197697e+03 vctime 0.000017 mctime 0.000056 cktime 0.000076 intime 0.000090 outtime 0.000062 cpumem 1.440000e+03 gpumem 9.600000e+02 tottime 0.004084
+
+#--------------------
+# 2-way CCC metric, small case.
+#--------------------
+
+env OMP_NUM_THREADS=7 $AR_PERFORMANCE_FLAGS \
+jsrun --nrs 1 --rs_per_host 1 \
+  --tasks_per_rs 1 --cpu_per_rs 7 --bind packed:7 --gpu_per_rs 1 -X 1 \
+  ./install_release/bin/genomics_metric \
+    --num_field 2 --num_vector 4 --num_proc_vector 1 \
+    --metric_type ccc --num_way 2 \
+    --compute_method GPU --all2all yes --verbosity 3
+
+vec_proc 0 vec 0 field_proc 0 field 0 value 00
+vec_proc 0 vec 0 field_proc 0 field 1 value 01
+vec_proc 0 vec 1 field_proc 0 field 0 value 10
+vec_proc 0 vec 1 field_proc 0 field 1 value 11
+vec_proc 0 vec 2 field_proc 0 field 0 value 01
+vec_proc 0 vec 2 field_proc 0 field 1 value 00
+vec_proc 0 vec 3 field_proc 0 field 0 value 11
+vec_proc 0 vec 3 field_proc 0 field 1 value 10
+element (0,1): values: 0 0 4.68750000000000000e-01 0 1 5.62500000000000000e-01 1 0 0.00000000000000000e+00 1 1 4.68750000000000000e-01
+element (0,2): values: 0 0 5.62500000000000000e-01 0 1 4.68750000000000000e-01 1 0 4.68750000000000000e-01 1 1 0.00000000000000000e+00
+element (1,2): values: 0 0 2.34375000000000000e-01 0 1 3.90625000000000000e-01 1 0 7.03125000000000000e-01 1 1 2.34375000000000000e-01
+element (0,3): values: 0 0 2.34375000000000000e-01 0 1 7.03125000000000000e-01 1 0 3.90625000000000000e-01 1 1 2.34375000000000000e-01
+element (1,3): values: 0 0 0.00000000000000000e+00 0 1 4.68750000000000000e-01 1 0 4.68750000000000000e-01 1 1 5.62500000000000000e-01
+element (2,3): values: 0 0 4.68750000000000000e-01 0 1 5.62500000000000000e-01 1 0 0.00000000000000000e+00 1 1 4.68750000000000000e-01
+metrics checksum 0-245201878478-801640733671948288 ctime 0.004888 ops 8.192000e+03 ops_rate 1.676003e+06 ops_rate/proc 1.676003e+06 vcmp 6.000000e+00 cmp 4.800000e+01 ecmp 1.200000e+01 ecmp_rate 2.455083e+03 ecmp_rate/proc 2.455083e+03 vctime 0.000700 mctime 0.000027 cktime 0.000045 intime 0.000073 outtime 0.000135 cpumem 1.024000e+03 gpumem 2.752000e+03 tottime 0.006013
+
+#--------------------
+# Larger case, using tensor cores.
+#--------------------
+
+env OMP_NUM_THREADS=7 $AR_PERFORMANCE_FLAGS \
+jsrun --nrs 12 --rs_per_host 6 \
+  --tasks_per_rs 1 --cpu_per_rs 7 --bind packed:7 --gpu_per_rs 1 -X 1 \
+  ./install_release/bin/genomics_metric \
+    --num_field 400000 --num_vector 100000 --num_proc_vector 10 \
+    --metric_type ccc --num_way 2 \
+    --compute_method GPU --tc 1 --num_tc_steps 4 --all2all yes --verbosity 1
+
+metrics checksum 138-217645116196906322-630503947831869440 ctime 23.484884 ops 1.760000e+16 ops_rate 7.494182e+14 ops_rate/proc 7.494182e+13 vcmp 4.999950e+09 cmp 7.999920e+15 ecmp 1.999980e+15 ecmp_rate 8.516031e+13 ecmp_rate/proc 8.516031e+12 vctime 0.209915 mctime 0.434914 cktime 150.661019 intime 15.280343 outtime 0.000036 cpumem 2.480000e+10 gpumem 1.420256e+10 tottime 190.071566
+
+#--------------------
+# 3-way CCC metric, small case.
+#--------------------
+
+env OMP_NUM_THREADS=7 $AR_PERFORMANCE_FLAGS \
+jsrun --nrs 1 --rs_per_host 1 \
+  --tasks_per_rs 1 --cpu_per_rs 7 --bind packed:7 --gpu_per_rs 1 -X 1 \
+  ./install_release/bin/genomics_metric \
+    --num_field 2 --num_vector 4 --num_proc_vector 1 \
+    --metric_type ccc --num_way 3 \
+    --compute_method GPU --all2all yes --verbosity 3
+
+vec_proc 0 vec 0 field_proc 0 field 0 value 00
+vec_proc 0 vec 0 field_proc 0 field 1 value 01
+vec_proc 0 vec 1 field_proc 0 field 0 value 10
+vec_proc 0 vec 1 field_proc 0 field 1 value 11
+vec_proc 0 vec 2 field_proc 0 field 0 value 01
+vec_proc 0 vec 2 field_proc 0 field 1 value 00
+vec_proc 0 vec 3 field_proc 0 field 0 value 11
+vec_proc 0 vec 3 field_proc 0 field 1 value 10
+element (0,1,2): values: 0 0 0 1.17187500000000000e-01 0 0 1 1.95312500000000000e-01 0 1 0 2.10937500000000000e-01 0 1 1 1.17187500000000000e-01 1 0 0 0.00000000000000000e+00 1 0 1 0.00000000000000000e+00 1 1 0 2.34375000000000000e-01 1 1 1 0.00000000000000000e+00
+element (0,1,3): values: 0 0 0 0.00000000000000000e+00 0 0 1 2.34375000000000000e-01 0 1 0 1.17187500000000000e-01 0 1 1 2.10937500000000000e-01 1 0 0 0.00000000000000000e+00 1 0 1 0.00000000000000000e+00 1 1 0 1.95312500000000000e-01 1 1 1 1.17187500000000000e-01
+element (0,2,3): values: 0 0 0 1.17187500000000000e-01 0 0 1 2.10937500000000000e-01 0 1 0 0.00000000000000000e+00 0 1 1 2.34375000000000000e-01 1 0 0 1.95312500000000000e-01 1 0 1 1.17187500000000000e-01 1 1 0 0.00000000000000000e+00 1 1 1 0.00000000000000000e+00
+element (1,2,3): values: 0 0 0 0.00000000000000000e+00 0 0 1 1.17187500000000000e-01 0 1 0 0.00000000000000000e+00 0 1 1 1.95312500000000000e-01 1 0 0 2.34375000000000000e-01 1 0 1 2.10937500000000000e-01 1 1 0 0.00000000000000000e+00 1 1 1 1.17187500000000000e-01
+metrics checksum 0-20352394550-918734323983581184 ctime 0.003616 ops 0.000000e+00 ops_rate 0.000000e+00 ops_rate/proc 0.000000e+00 vcmp 4.000000e+00 cmp 6.400000e+01 ecmp 8.000000e+00 ecmp_rate 2.212332e+03 ecmp_rate/proc 2.212332e+03 vctime 0.000017 mctime 0.000047 cktime 0.000062 intime 0.000073 outtime 0.000135 cpumem 1.472000e+03 gpumem 8.320000e+02 tottime 0.004069
+

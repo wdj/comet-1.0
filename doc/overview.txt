@@ -1,0 +1,103 @@
+
+CoMet Code Overview, 23 Jan 2019
+--------------------------------
+
+It is assumed the reader is familiar with the CoMet algorithms
+and parallel implementation. See the following references:
+
+1. W. Joubert, J. Nance, D. Weighill, D. Jacobson,
+"Parallel Accelerated Vector Similarity Calculations for Genomics Applications,"
+Parallel Computing, vol. 75, July 2018, pp. 130-145,
+https://www.sciencedirect.com/science/article/pii/S016781911830084X,
+https://arxiv.org/abs/1705.08210.
+
+2. W. Joubert, J. Nance, S. Climer, D. Weighill, D. Jacobson,
+"Parallel Accelerated Custom Correlation Coefficient Calculations
+for Genomics Applications," Parallel Computing 84 (2019), 15-23,
+https://www.sciencedirect.com/science/article/pii/S0167819118301431,
+https://arxiv.org/abs/1705.08213
+
+3. Wayne Joubert, Deborah Weighill, David Kainer, Sharlee Climer, Amy Justice,
+Kjiersten Fagnan, Daniel Jacobson, "Attacking the Opioid Epidemic:
+Determining the Epistatic and Pleiotropic Genetic Architectures
+for Chronic Pain and Opioid Addiction," SC18 Gordon Bell Award paper,
+https://dl.acm.org/citation.cfm?id=3291732
+
+4. "GPU-enabled comparative genomics calculations on leadership-class HPC
+systems," http://on-demand.gputechconf.com/gtc/2017/presentation/s7156-wayne-joubert-comparative.pdf
+
+5. "CoMet: An HPC application for comparative genomics calculations,"
+https://www.olcf.ornl.gov/wp-content/uploads/2017/11/2018UM-Day1-Joubert.pdf
+
+----------
+
+The current development repository is https://code.ornl.gov/wjd/genomics_gpu.
+The public release snapshot https://github.com/wdj/comet.git.
+
+----------
+
+The code was originally written in C in an object oriented style. Subsequently,
+then the code is being rewritten in C++.  As of this writing, the code
+is going through significant revision/restructuring; however, the
+high-level structure is not likely to change much.
+
+The code loosely adheres to the Google C++ style guide,
+https://google.github.io/styleguide/cppguide.html.  Source code is formatted
+with clang-format -style chromium.
+
+----------
+
+The following are the main repo subdirectories:
+
+- ATTIC - defunct code from original prototypes
+
+- doc - documentation
+
+- src - priomary source code directory
+
+- driver - command line driver source code
+
+- tpls - source code for publicly available third party libraries
+
+- magma_patch - code to modify the MAGMA library to support needed operations
+
+- scripts - shell scripts for building etc.
+
+- testing - source code for testing, using CTest and googletest.
+
+- tools - software tools, mainly for mnipulating CoMet input and output files
+
+----------
+
+The following commands configure, build and test all versions
+of CoMet on Summit.  This is the typical setup used for development.
+Bash shell is assumed.
+
+mkdir comet_work
+cd comet_work
+module load git
+git clone https://code.ornl.gov/wjd/genomics_gpu.git
+MY_PROJID=stf006  #---replace stf006 with your OLCF account id.
+env OLCF_PROJECT=$MY_PROJID ./genomics_gpu/scripts/configure_all.sh
+./genomics_gpu/scripts/make_all.sh
+bsub -P $MY_PROJID -Is -nnodes 2 -W 120 -alloc_flags gpumps $SHELL
+...
+./genomics_gpu/scripts/test_all.sh
+
+----------
+
+The following runs a simple test case.  Bash shell is assumed.
+
+MY_PROJID=stf006  #---replace stf006 with your OLCF account id.
+bsub -P $MY_PROJID -Is -nnodes 1 -W 120 $SHELL
+...
+module -q load gcc/6.4.0
+AR_PERFORMANCE_FLAGS="PAMI_IBV_ENABLE_DCT=1 PAMI_ENABLE_STRIPING=1 PAMI_IBV_ADAPTER_AFFINITY=0 PAMI_IBV_QP_SERVICE_LEVEL=8 PAMI_IBV_ENABLE_OOO_AR=1"
+env OMP_NUM_THREADS=7 $AR_PERFORMANCE_FLAGS \
+jsrun --nrs 1 --rs_per_host 1 \
+  --tasks_per_rs 1 --cpu_per_rs 7 --bind packed:7 --gpu_per_rs 1 -X 1 \
+  ./install_release/bin/genomics_metric \
+    --num_field 2 --num_vector 4 --num_proc_vector 1 \
+    --metric_type czekanowski --num_way 2 \
+    --compute_method GPU --all2all yes --verbosity 3
+

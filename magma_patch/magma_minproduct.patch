@@ -1,0 +1,146 @@
+diff -aur magma_minproduct.cloned/Makefile.internal magma_minproduct/Makefile.internal
+--- magma_minproduct.cloned/Makefile.internal	2019-01-11 10:29:03.373521000 -0500
++++ magma_minproduct/Makefile.internal	2019-02-07 08:17:24.794418000 -0500
+@@ -94,8 +94,8 @@
+ #
+ # See also $(info compile for ...) in Makefile
+ #
+-NV_SM    :=
+-NV_COMP  :=
++#NV_SM    :=
++#NV_COMP  :=
+ 
+ ifneq ($(findstring sm10, $(GPU_TARGET)),)
+     # sm10 is no longer supported by CUDA 6.x nvcc
+diff -aur magma_minproduct.cloned/magma_minproductblas/dgemm_tesla_T_N.cu magma_minproduct/magma_minproductblas/dgemm_tesla_T_N.cu
+--- magma_minproduct.cloned/magma_minproductblas/dgemm_tesla_T_N.cu	2019-01-11 10:29:01.856503000 -0500
++++ magma_minproduct/magma_minproductblas/dgemm_tesla_T_N.cu	2019-01-11 10:30:47.280685000 -0500
+@@ -13,6 +13,45 @@
+ /*
+  * daxpy computes c += alpha*b, where b and c are 16-element vectors.
+  */
++//---BEGIN MODIFIED GENOMICS_METRICS
++#if 0
++static __device__ double mult_op(double a, double b)
++{
++    return a * b;
++}
++#endif
++
++#if 1
++static __device__ double mult_op(double a, double b)
++{
++    return a < b ? a : b;
++}
++#endif
++
++static __device__ void daxpy(
++    double alpha,
++    const double* __restrict__ b,
++    double*       __restrict__ c )
++{
++    c[0]  += mult_op(alpha, b[0]);
++    c[1]  += mult_op(alpha, b[1]);
++    c[2]  += mult_op(alpha, b[2]);
++    c[3]  += mult_op(alpha, b[3]);
++    c[4]  += mult_op(alpha, b[4]);
++    c[5]  += mult_op(alpha, b[5]);
++    c[6]  += mult_op(alpha, b[6]);
++    c[7]  += mult_op(alpha, b[7]);
++    c[8]  += mult_op(alpha, b[8]);
++    c[9]  += mult_op(alpha, b[9]);
++    c[10] += mult_op(alpha, b[10]);
++    c[11] += mult_op(alpha, b[11]);
++    c[12] += mult_op(alpha, b[12]);
++    c[13] += mult_op(alpha, b[13]);
++    c[14] += mult_op(alpha, b[14]);
++    c[15] += mult_op(alpha, b[15]);
++}
++
++#if 0
+ static __device__ void daxpy(
+     double alpha,
+     const double* __restrict__ b,
+@@ -35,7 +74,9 @@
+     c[14] += alpha * b[14];
+     c[15] += alpha * b[15];
+ }
++#endif
+ 
++//---END MODIFIED GENOMICS_METRICS
+ 
+ /**
+     Purpose:
+diff -aur magma_minproduct.cloned/magma_minproductblas/gemm_stencil.cuh magma_minproduct/magma_minproductblas/gemm_stencil.cuh
+--- magma_minproduct.cloned/magma_minproductblas/gemm_stencil.cuh	2019-01-11 10:29:02.317510000 -0500
++++ magma_minproduct/magma_minproductblas/gemm_stencil.cuh	2019-01-11 10:30:47.284688000 -0500
+@@ -344,7 +344,10 @@
+                       #ifdef CONJ_B
+                         fma(rA[m], conj(rB[n]), rC[n][m]);
+                       #else
+-                        fma(rA[m], rB[n], rC[n][m]);
++                        //---BEGIN MODIFIED GENOMICS_METRICS
++                        //fma(rA[m], rB[n], rC[n][m]);
++                        myfmin(rA[m], rB[n], rC[n][m]);
++                        //---END MODIFIED GENOMICS_METRICS
+                       #endif
+                     #endif
+                 }
+@@ -419,7 +422,10 @@
+                   #ifdef CONJ_B
+                     fma(rA[m], conj(rB[n]), rC[n][m]);
+                   #else
+-                    fma(rA[m], rB[n], rC[n][m]);
++                    //---BEGIN MODIFIED GENOMICS_METRICS
++                    //fma(rA[m], rB[n], rC[n][m]);
++                    myfmin(rA[m], rB[n], rC[n][m]);
++                    //---END MODIFIED GENOMICS_METRICS
+                   #endif
+                 #endif
+             }
+diff -aur magma_minproduct.cloned/magma_minproductblas/gemm_stencil_defs.h magma_minproduct/magma_minproductblas/gemm_stencil_defs.h
+--- magma_minproduct.cloned/magma_minproductblas/gemm_stencil_defs.h	2019-01-11 10:29:02.322515000 -0500
++++ magma_minproduct/magma_minproductblas/gemm_stencil_defs.h	2019-01-11 10:30:47.288685000 -0500
+@@ -96,12 +96,18 @@
+     #define add(A, B)        cuCadd(A, B)
+     #define mul(A, B)        cuCmul(A, B)
+     #define fma(A, B, C) C = cuCfma(A, B, C)
++    //---BEGIN ADDED GENOMICS_METRICS
++    #define myfmin(A, B, C) C = cuCfma(A, B, C)
++    //---END ADDED GENOMICS_METRICS
+     #define make_FloatingPoint(x, y) make_cuDoubleComplex(x, y);
+   #else
+     #define conj(A)          cuConjf(A)
+     #define add(A, B)        cuCaddf(A, B)
+     #define mul(A, B)        cuCmulf(A, B)
+     #define fma(A, B, C) C = cuCfmaf(A, B, C)
++    //---BEGIN ADDED GENOMICS_METRICS
++    #define myfmin(A, B, C) C = cuCfmaf(A, B, C)
++    //---END ADDED GENOMICS_METRICS
+     #define make_FloatingPoint(x, y) make_cuFloatComplex(x, y);
+   #endif
+ #else
+@@ -109,6 +115,23 @@
+     #define add(A, B)         (A+B)
+     #define mul(A, B)         (A*B)
+     #define fma(A, B, C) C += (A*B)
++//#define myfmin(A, B, C) fma(A, B, C)
++    //---BEGIN ADDED GENOMICS_METRICS
++    #ifdef DOUBLE
++      #if (__CUDA_ARCH__ == 700)
++        #define myfmin(A, B, C) C += ((double)fminf((float)(A), (float)(B)))
++      #else
++        #define myfmin(A, B, C) C += fmin((A), (B))
++      #endif
++      //#define myfmin(A, B, C) C += fmin((A), (B))
++      //#define myfmin(A, B, C) C += ( (A) < (B) ? (A) : (B) )
++      //#define myfmin(A, B, C) C += fminf((A), (B))
++      //#define myfmin(A, B, C) C += ( ( (A) + (B) - fabs( (A) - (B) ) ) * .5 )
++    #else
++      #define myfmin(A, B, C) C += fminf((A), (B))
++      //#define myfmin(A, B, C) C += ( (A) < (B) ? (A) : (B) )
++    #endif
++    //---END ADDED GENOMICS_METRICS
+     #define make_FloatingPoint(x, y) (x)
+ #endif
+ 
