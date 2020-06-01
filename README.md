@@ -27,24 +27,19 @@ https://arxiv.org/abs/1705.08210.
 
 W. Joubert, J. Nance, S. Climer, D. Weighill, D. Jacobson,
 "Parallel Accelerated Custom Correlation Coefficient Calculations
-for Genomics Applications," arxiv 1705.08213 [cs], Parallel Computing, accepted,
+for Genomics Applications," Parallel Computing 84 (2019), 15-23,
+https://www.sciencedirect.com/science/article/pii/S0167819118301431,
 https://arxiv.org/abs/1705.08213
-
-Wayne Joubert, Deborah Weighill, David Kainer, Sharlee Climer, Amy Justice,
-Kjiersten Fagnan, Daniel Jacobson, "Attacking the Opioid Epidemic:
-Determining the Epistatic and Pleiotropic Genetic Architectures
-for Chronic Pain and Opioid Addiction," SC18 Gordon Bell paper,
-https://dl.acm.org/citation.cfm?id=3291732
-
-"GPU-enabled comparative genomics calculations on leadership-class HPC systems,"
-http://on-demand.gputechconf.com/gtc/2017/presentation/s7156-wayne-joubert-comparative.pdf
-
-"CoMet: An HPC application for comparative genomics calculations,"
-https://www.olcf.ornl.gov/wp-content/uploads/2017/11/2018UM-Day1-Joubert.pdf
 
 Wayne Joubert, Deborah Weighill, David Kainer, Sharlee Climer, Amy Justice,
 Kjiersten Fagnan, Daniel Jacobson, "Attacking the Opioid Epidemic:
 Determining the Epistatic and Pleiotropic Genetic Architectures
 for Chronic Pain and Opioid Addiction," SC18 Gordon Bell Award paper,
 https://dl.acm.org/citation.cfm?id=3291732
+
+"GPU-enabled comparative genomics calculations on leadership-class HPC
+systems," http://on-demand.gputechconf.com/gtc/2017/presentation/s7156-wayne-joubert-comparative.pdf
+
+"CoMet: An HPC application for comparative genomics calculations,"
+https://www.olcf.ornl.gov/wp-content/uploads/2017/11/2018UM-Day1-Joubert.pdf
 
